@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <ImageView
+        android:id="@+id/roadBackground1"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/road1"
+        android:scaleType="fitXY" />
+    <ImageView
+        android:id="@+id/roadBackground2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/road1"
+        android:scaleType="fitXY" />
+    <ImageView
+        android:id="@+id/playerBike"
+        android:layout_width="60dp"
+        android:layout_height="90dp"
+        android:src="@drawable/redbike"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true" />
+    <TextView
+        android:id="@+id/scoreText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Score: 0"
+        android:textSize="24sp"
+        android:textColor="@color/white"
+        android:layout_marginTop="20dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true" />
+    <Button
+        android:id="@+id/restartButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Restart"
+        android:visibility="gone"
+        android:layout_centerInParent="true"
+        android:background="@color/black"
+        android:textColor="@color/white" />
+</RelativeLayout>
