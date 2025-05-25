@@ -24,7 +24,13 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler()
     private var gameRunning = true
     private val enemyBikes = mutableListOf<ImageView>()
-    private val enemySpeeds = mutableListOf<Int>() // Individual speeds for each enemy
+    private val enemySpeeds = mutableListOf<Int>()
+
+    // Smooth movement variables
+    private var targetX = 0f // სადაც უნდა მივიდეს ბაიკი
+    private var currentX = 0f // ამჟამინდელი პოზიცია
+    private val movementSpeed = 0.05f // მოძრაობის სიჩქარე (0.1 = ნელა, 0.3 = სწრაფად)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -36,8 +42,12 @@ class MainActivity : AppCompatActivity() {
         restartButton = findViewById(R.id.restartButton)
 
         playerBike.post {
-            playerBike.x = (resources.displayMetrics.widthPixels / 2 - playerBike.width / 2).toFloat()
+            val screenWidth = resources.displayMetrics.widthPixels
+            currentX = (screenWidth / 2 - playerBike.width / 2).toFloat()
+            targetX = currentX
+            playerBike.x = currentX
         }
+
         // Start game
         startNewGame()
         // Restart game on button click
@@ -45,6 +55,7 @@ class MainActivity : AppCompatActivity() {
             startNewGame()
         }
     }
+
     private fun startNewGame() {
         // Reset variables
         score = 0
@@ -63,45 +74,56 @@ class MainActivity : AppCompatActivity() {
         // Reset road positions
         roadBackground1.y = 0f
         roadBackground2.y = -resources.displayMetrics.heightPixels.toFloat()
-        // Create and add new enemy bikes dynamically
-        val numberOfEnemies = 3 // You can increase this number to add more enemies
+
+        val screenWidth = resources.displayMetrics.widthPixels
+        val roadLeftMargin = (screenWidth * 0.15).toInt()
+        val roadRightMargin = (screenWidth * 0.15).toInt()
+        val roadWidth = screenWidth - roadLeftMargin - roadRightMargin
+        val enemyWidth = 140
+
+        val numberOfEnemies = 3
         for (i in 1..numberOfEnemies) {
             val enemyBike = ImageView(this).apply {
                 setImageResource(R.drawable.bikeblue)
                 layoutParams = RelativeLayout.LayoutParams(
-                    140, // Enemy width
-                    200  // Enemy height
+                    enemyWidth,
+                    200
                 ).apply {
-                    topMargin = -200 // Start above the screen
+                    topMargin = -200
                 }
-                x = Random.nextInt(
+                x = (roadLeftMargin + Random.nextInt(
                     0,
-                    resources.displayMetrics.widthPixels - 140 // Adjusted for new width
-                ).toFloat()
+                    roadWidth - enemyWidth
+                )).toFloat()
                 y = -200f
             }
-            rootLayout.addView(enemyBike) // Add to layout
+            rootLayout.addView(enemyBike)
             enemyBikes.add(enemyBike)
-            enemySpeeds.add(10 + i * 2) // Varying speed for each enemy
+            enemySpeeds.add(10 + i * 2)
         }
+
         playerBike.post {
-            playerBike.x = (resources.displayMetrics.widthPixels / 2 - playerBike.width / 2).toFloat()
+            currentX = (screenWidth / 2 - playerBike.width / 2).toFloat()
+            targetX = currentX
+            playerBike.x = currentX
+            playerBike.y = (resources.displayMetrics.heightPixels * 0.8).toFloat()
         }
+
         // Start mechanics
         setupScrollingBackground()
         moveEnemyBikes()
         setupPlayerControls()
+        smoothPlayerMovement() // ახალი ფუნქცია smooth movement-ისთვის
     }
+
     private fun setupScrollingBackground() {
         val runnable = object : Runnable {
             override fun run() {
                 if (!gameRunning) return
 
-                // Move backgrounds at dynamic speed
                 roadBackground1.y += dynamicRoadSpeed
                 roadBackground2.y += dynamicRoadSpeed
 
-                // Reset positions
                 if (roadBackground1.y >= resources.displayMetrics.heightPixels) {
                     roadBackground1.y = roadBackground2.y - resources.displayMetrics.heightPixels
                 }
@@ -114,32 +136,36 @@ class MainActivity : AppCompatActivity() {
         }
         handler.post(runnable)
     }
+
     private fun moveEnemyBikes() {
         val runnable = object : Runnable {
             override fun run() {
                 if (!gameRunning) return
+
+                val screenWidth = resources.displayMetrics.widthPixels
+                val roadLeftMargin = (screenWidth * 0.15).toInt()
+                val roadRightMargin = (screenWidth * 0.15).toInt()
+                val roadWidth = screenWidth - roadLeftMargin - roadRightMargin
+                val enemyWidth = 140
 
                 for (i in enemyBikes.indices) {
                     val enemyBike = enemyBikes[i]
                     val newY = enemyBike.y + enemySpeeds[i]
 
                     if (newY > resources.displayMetrics.heightPixels) {
-                        // Reset enemy bike position
                         enemyBike.y = -200f
-                        enemyBike.x = Random.nextInt(
+                        enemyBike.x = (roadLeftMargin + Random.nextInt(
                             0,
-                            resources.displayMetrics.widthPixels - 140
-                        ).toFloat()
+                            roadWidth - enemyWidth
+                        )).toFloat()
 
-                        // Increment score
                         score++
                         scoreText.text = "Score: $score"
 
-                        // Adjust speed dynamically based on score
-                        if (score % 1 == 0) { // Change speed every 5 points
-                            val speedIncrement = (1 + score / 20).coerceAtMost(10) // Gradual increment
+                        if (score % 1 == 0) {
+                            val speedIncrement = (1 + score / 20).coerceAtMost(10)
                             enemySpeeds[i] += speedIncrement
-                            dynamicRoadSpeed += speedIncrement  // Increase road speed slower
+                            dynamicRoadSpeed += speedIncrement
                         }
                     } else {
                         enemyBike.y = newY
@@ -147,6 +173,25 @@ class MainActivity : AppCompatActivity() {
                 }
                 checkCollisions()
                 handler.postDelayed(this, 30)
+            }
+        }
+        handler.post(runnable)
+    }
+
+    // ახალი ფუნქცია smooth movement-ისთვის
+    private fun smoothPlayerMovement() {
+        val runnable = object : Runnable {
+            override fun run() {
+                if (!gameRunning) return
+
+                // თანდათან მიახლოება targetX-ს
+                val distance = targetX - currentX
+                if (kotlin.math.abs(distance) > 1f) { // თუ დისტანცია 1 პიქსელზე მეტია
+                    currentX += distance * movementSpeed
+                    playerBike.x = currentX
+                }
+
+                handler.postDelayed(this, 16) // ~60 FPS
             }
         }
         handler.post(runnable)
@@ -161,27 +206,18 @@ class MainActivity : AppCompatActivity() {
 
             when (event.action) {
                 MotionEvent.ACTION_MOVE -> {
-                    // Adjust the position of the bike based on the touch
-                    val offsetY = 200f // Offset the bike above the touch point
-
-                    // Calculate the new x and y positions
-                    var newX = event.rawX - playerBike.width / 2
-                    var newY = event.rawY - playerBike.height / 2 - offsetY
-
-                    // Clamp the position to keep the bike within screen boundaries
                     val screenWidth = resources.displayMetrics.widthPixels
-                    val screenHeight = resources.displayMetrics.heightPixels
-                    val minX = 0f
-                    val maxX = (screenWidth - playerBike.width).toFloat()
-                    val minY = 0f
-                    val maxY = (screenHeight - playerBike.height).toFloat()
+                    val roadLeftMargin = (screenWidth * 0.15).toFloat()
+                    val roadWidth = screenWidth - (roadLeftMargin * 2)
 
-                    newX = newX.coerceIn(minX, maxX)
-                    newY = newY.coerceIn(minY, maxY)
+                    var touchX = event.x
+                    var newTargetX = touchX - playerBike.width / 2
 
-                    // Update the bike's position
-                    playerBike.x = newX
-                    playerBike.y = newY
+                    val minX = roadLeftMargin
+                    val maxX = roadLeftMargin + roadWidth - playerBike.width
+
+                    // მხოლოდ target position-ს ვაყენებთ, actual movement იქნება smooth
+                    targetX = newTargetX.coerceIn(minX, maxX)
                 }
             }
             true
@@ -189,7 +225,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkCollisions() {
-        val padding = 30 // Adjust collision area
+        val padding = 30
 
         val playerRect = Rect(
             (playerBike.x + padding).toInt(),
